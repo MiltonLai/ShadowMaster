@@ -1,0 +1,8 @@
+<?php
+
+$config = array(
+    'server_host'      => '0.0.0.0',
+    'server_port'      => 8080,
+    'port_min'         => 18000,
+    'port_max'         => 18099,
+);
