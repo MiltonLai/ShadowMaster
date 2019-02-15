@@ -4,7 +4,7 @@ config.php
 # Composer files
 composer.lock
 composer.phar
-vender/*
+vendor/*
 
 # Package Files #
 *.jar

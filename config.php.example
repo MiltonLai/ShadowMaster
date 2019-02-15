@@ -3,6 +3,11 @@
 $config = array(
     'server_host'      => '0.0.0.0',
     'server_port'      => 8080,
-    'port_min'         => 18000,
-    'port_max'         => 18099,
+    'server_daemonize' => false,
+    'worker_num'       => 3,
+    'no_socket_test'   => true,
+    'secret'           => '4297f44b13955235245b2497399d7a93',
+
+    'ss_port_min'         => 18000,
+    'ss_port_max'         => 19000,
 );

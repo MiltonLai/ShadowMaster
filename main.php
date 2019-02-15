@@ -8,6 +8,7 @@
 define("DIR_BASE", __DIR__);
 define("DIR_LOGS", DIR_BASE . DIRECTORY_SEPARATOR . 'logs');
 define("DIR_WEB", DIR_BASE . DIRECTORY_SEPARATOR . 'webapp');
+define("ANONYMOUS_UID", '0');
 
 require 'config.php';
 require 'apps/Autoloader.php';

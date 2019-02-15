@@ -3,6 +3,8 @@
 class Server extends SwooleBase
 {
     private $serv;
+    private $table;
+    private $session_manager;
     private $sockets;
     private $config;
 
@@ -11,11 +13,22 @@ class Server extends SwooleBase
         $this->config = $config;
         $this->sockets = array();
 
+        $this->table = new \Swoole\Table(1024);
+        $this->table->column('sid', swoole_table::TYPE_STRING, 32);
+        $this->table->column('uid', swoole_table::TYPE_STRING, 32);
+        $this->table->column('username', swoole_table::TYPE_STRING, 64);
+        $this->table->column('secure', swoole_table::TYPE_STRING, 32);
+        $this->table->column('started_at', swoole_table::TYPE_INT, 4);
+        $this->table->column('updated_at', swoole_table::TYPE_INT, 4);
+        $this->table->create();
+
+        $this->session_manager = new SessionManager($this->config, $this->table);
+
         $this->serv = new \Swoole\Http\Server($this->config['server_host'], $this->config['server_port']);
         $this->serv->set(array(
-            'worker_num' => 3,
-            'daemonize' => true,
-            'max_request' => 5,
+            'worker_num' => $this->config['worker_num'],
+            'daemonize' => $this->config['server_daemonize'],
+            'max_request' => 1000,
             'dispatch_mode' => 1,
             'reload_async' => true,
             'log_file' => DIR_LOGS . DIRECTORY_SEPARATOR . 'server.log',
@@ -51,7 +64,7 @@ class Server extends SwooleBase
         if ($this->sysFilter($request, $response)) return;
 
         $socket = $this->sockets[$worker_id];
-        $handler = new RequestHandler($this->config, $request, $response, $socket);
+        $handler = new RequestHandler($this->config, $this->session_manager, $request, $response, $socket);
         if (!$handler->handle()) {
             echo $handler->getErrorCode() . "\n";
             $this->response($response, 500, 'text/html', 'Error 500', 'Internal error: ' . $handler->getErrorCode());
@@ -116,8 +129,10 @@ class Server extends SwooleBase
         if (!$socket->bind($tmp_socket_file)) {
             throw new RuntimeException('unable to bind to ' . $tmp_socket_file);
         }
-        if (!$socket->connect('/var/run/shadowsocks-libev.sock', 0, 10)) {
-            throw new RuntimeException("unable to connect to shadowsocks socket");
+        if (!$this->config['no_socket_test']) {
+            if (!$socket->connect('/var/run/shadowsocks-libev.sock', 0, 10)) {
+                throw new RuntimeException("unable to connect to shadowsocks socket");
+            }
         }
         $this->sockets[$worker_id] = $socket;
     }
