@@ -5,7 +5,7 @@
     <title>API Demo</title>
     <script type="text/javascript" src="./jquery-1.10.2.js"></script>
     <script type="text/javascript" src="./jquery.cookie.js"></script>
-    <script type="text/javascript" src="./md5.js"></script>s
+    <script type="text/javascript" src="./md5.js"></script>
     <script type="text/javascript">
         var sys_configs = new Object(); // Global js variable
         sys_configs.site_base = 'http://127.0.0.1:50099';
@@ -14,34 +14,23 @@
     </script>
 </head>
 <body>
-<h3>Client Parameters</h3>
-<table border="0">
-    <tr>
-        <td>secure</td>
-        <td><input id="client_secure" type="text" value="" size="50"></td>
-    </tr>
-</table>
-<button id="cookies_btn" class="button-set">Set Cookies</button>
-<hr>
-<h3>Get Session</h3>
-<h5>method: POST, URL: http://[ip]:[port]/[project]/session_start </h5>
+<h3>Client Secure</h3>
+<input id="client_secure" placeholder="Secure" type="text" value="" size="50">
+<button id="cookies_btn" class="button-set">Set Secure</button>
+
+<h3>Session Start</h3>
 <button id="session_btn" class="button-set">Get New Session</button>
-<h5><span id="session_url"></span></h5>
-<table border="0">
-    <tr>
-        <td width="50">sid</td>
-        <td><input id="client_sid" type="text" value="" size="36"></td>
-    </tr>
-</table>
-<h3>登录/登出</h3>
-<h5>method: POST, URL: http://[ip]:[port]/[project]/v2/entry/ping.json</h5>
-<h5>method: POST, URL: http://[ip]:[port]/[project]/login</h5>
-<h5>method: POST, URL: http://[ip]:[port]/[project]/v2/entry/logout.json</h5>
-<input id="username" type="text" value="" size="20"> <input id="password" type="text" value="" size="20">
+<input id="client_sid" type="text" size="36">
+
+<h3>Login / Logout</h3>
+<input id="username" type="text" value="" placeholder="Username" style="width:100px;">
+<input id="password" type="text" value="" placeholder="Password" style="width:100px;">
 <button id="login_btn" class="button-set">Login</button>
 <button id="logout_btn" class="button-set">Logout</button>
 <button id="ping_btn" class="button-set">Ping</button>
-<hr>
+
+<h3>Reload</h3>
+<button id="reload_btn" class="button-set">Reload</button>
 
 <h3>Run Request</h3>
 <input id="req_url" type="text" value="" size="100">
@@ -52,19 +41,7 @@
 <hr>
 
 <script type="text/javascript">
-    $("input").attr("style", "width:300px");
-    function AjaxForm(method, url, formId) {
-        $.ajax({
-            type: method,
-            url: url,
-            data: $(formId).serialize() + "&" + gen_parameters(),
-            dataType: "text"
-        }).done(function (data) {
-            $('#req_output').val($('#req_output').val() + data + "\n\n");
-        }).fail(function (jqXHR) {
-            alert(jqXHR.responseText);
-        });
-    }
+    req_output = $('#req_output');
 
     $('#cookies_btn').click(function () {
         set_cookie('#client_sid', 'sid');
@@ -72,15 +49,6 @@
     });
 
     $('#session_btn').click(function () {
-        var timestamp = new Date().getTime();
-        var hash = hex_md5(
-            $('#system_token').val()
-            + $('#client_secure1').val()
-            + $('#client_secure2').val()
-            + $('#client_secure3').val()
-            + timestamp);
-        $('#session_url').text('?secure=' + $('#client_secure').val());
-
         $.ajax({
             type: 'GET',
             url: sys_configs.root_path + '/session_start',
@@ -90,50 +58,58 @@
             cache: false,
             dataType: "json"
         }).done(function (data) {
-            update_cookie('#client_sid', 'sid', data.data);
+            update_cookie('#client_sid', 'sid', data.data.sid);
+            req_output.val(req_output.val() + JSON.stringify(data) + "\n");
         }).fail(function (jqXHR) {
             alert(jqXHR.responseText);
         });
     });
 
     $('#login_btn').click(function () {
-        var parameters = gen_parameters();
-        var req_url = '/login?' + parameters;
-
         $.ajax({
             type: 'GET',
-            url: sys_configs.root_path + req_url,
+            url: sys_configs.root_path + '/login?' + gen_parameters(),
             cache: false,
             data: {
                 username: $('#username').val(),
                 password: $('#password').val()
             },
-            dataType: "text"
+            dataType: 'json'
         }).done(function (data) {
-            $('#req_output').val($('#req_output').val() + data + "\n");
+            req_output.val(req_output.val() + JSON.stringify(data) + "\n");
         }).fail(function (jqXHR) {
             alert(jqXHR.responseText);
         });
     });
 
     $('#logout_btn').click(function () {
-        var parameters = gen_parameters();
-        var req_url = '/v2/entry/logout.json?' + parameters;
-
         $.ajax({
-            type: 'POST',
-            url: sys_configs.root_path + req_url,
+            type: 'GET',
+            url: sys_configs.root_path + '/logout?' + gen_parameters(),
             cache: false,
-            dataType: "text"
+            dataType: 'json'
         }).done(function (data) {
-            $('#req_output').val($('#req_output').val() + data + "\n");
+            req_output.val(req_output.val() + JSON.stringify(data) + "\n");
+        }).fail(function (jqXHR) {
+            alert(jqXHR.responseText);
+        });
+    });
+
+    $('#reload_btn').click(function () {
+        $.ajax({
+            type: 'GET',
+            url: sys_configs.root_path + '/reload?' + gen_parameters(),
+            cache: false,
+            dataType: 'json'
+        }).done(function (data) {
+            req_output.val(req_output.val() + JSON.stringify(data) + "\n");
         }).fail(function (jqXHR) {
             alert(jqXHR.responseText);
         });
     });
 
     $('#clean_btn').click(function () {
-        $('#req_output').val('');
+        req_output.val('');
     });
 
     $('#ping_btn').click(function () {
@@ -146,7 +122,7 @@
             cache: false,
             dataType: "text"
         }).done(function (data) {
-            $('#req_output').val($('#req_output').val() + data + "\n");
+            req_output.val(req_output.val() + data + "\n");
         }).fail(function (jqXHR) {
             alert(jqXHR.responseText);
         });
@@ -176,7 +152,7 @@
             contentType: false,
             dataType: "text"
         }).done(function (data) {
-            $('#req_output').val($('#req_output').val() + data + "\n");
+            req_output.val(req_output.val() + data + "\n");
         }).fail(function (jqXHR) {
             alert(jqXHR.responseText);
         });

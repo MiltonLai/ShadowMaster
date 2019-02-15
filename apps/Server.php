@@ -13,7 +13,7 @@ class Server extends SwooleBase
         $this->config = $config;
         $this->sockets = array();
 
-        $this->table = new \Swoole\Table(1024);
+        $this->table = new \Swoole\Table($this->config['session_table_size']);
         $this->table->column('sid', swoole_table::TYPE_STRING, 32);
         $this->table->column('uid', swoole_table::TYPE_STRING, 32);
         $this->table->column('username', swoole_table::TYPE_STRING, 64);

@@ -11,15 +11,19 @@ class RequestHandler
     private $errCode;
 
     private static $static_extensions = [
-        'htm' => 'text/html',
-        'css' => 'text/css',
-        'js' => 'text/javascript',
-        'json' => 'application/json',
-        'png' => 'image/png',
-        'gif' => 'image/gif',
-        'jpg' => 'image/jpg',
-        'jpeg' => 'image/jpg',
-        'mp4' => 'video/mp4'
+        'html'  => 'text/html',
+        'htm'   => 'text/html',
+        'css'   => 'text/css',
+        'js'    => 'text/javascript',
+        'json'  => 'application/json',
+        'png'   => 'image/png',
+        'gif'   => 'image/gif',
+        'jpg'   => 'image/jpg',
+        'jpeg'  => 'image/jpg',
+        'pdf'   => 'application/pdf',
+        'doc'   => 'application/msword',
+        'mp4'   => 'video/mp4',
+        'zip'   => 'application/octet-stream',
     ];
 
     public function __construct(array $config, SessionManager $session_manager,  \Swoole\Http\Request $request, \Swoole\Http\Response $response, $socket)
@@ -42,6 +46,8 @@ class RequestHandler
                 return $this->doSessionStart();
             case '/login':
                 return $this->doLogin();
+            case '/logout':
+                return $this->doLogout();
             case '/ping':
                 return $this->doPing();
             case '/add':
@@ -58,12 +64,10 @@ class RequestHandler
     {
         $secure = $this->request->get['secure'];
         if (empty($secure)) {
-            $this->responseHtml(400, 'text/html', 'Error 400', 'Bad request: invalid parameters');
-            return true;
+            return $this->responseJson(1, 'Bad request: Invalid parameters');
         }
-        $sid = $this->session_manager->create($secure);
-        $this->responseJson(0, null, $sid);
-        return true;
+        $result = $this->session_manager->create($secure);
+        return $this->responseJson(0, null, $result);
     }
 
     public function doLogin(): bool
@@ -74,52 +78,57 @@ class RequestHandler
         $username = $this->request->get['username'];
         $password = $this->request->get['password'];
         if (empty($sid) || empty($username) || empty($password)) {
-            $this->responseHtml(400, 'text/html', 'Error 400', 'Bad request: invalid parameters');
-            return true;
+            return $this->responseJson(1, 'Bad request: Invalid parameters');
         }
         if ($this->session_manager->login($sid, $username, $password)) {
-            $this->responseJson(0, 'Success');
-            return true;
+            return $this->responseJson(0, 'Success');
         } else {
-            $this->responseJson(1, 'Failed');
-            return false;
+            return $this->responseJson(1, 'Failed');
         }
+    }
+
+    public function doLogout(): bool
+    {
+        $sid = $this->request->get['sid'];
+        if (empty($sid)) {
+            return $this->responseJson(1, 'Bad request: Invalid parameters');
+        }
+        if ($this->session_manager->logout($sid)) {
+            return $this->responseJson(0, 'Success');
+        } else {
+            return $this->responseJson(0, 'Failed');
+        }
+
     }
 
     public function doPing() : bool
     {
         $result = $this->send('ping');
         if (!$result) {
-            $this->responseJson(1, $this->errCode);
-            return false;
+            return $this->responseJson(1, $this->errCode);
         }
         $result = substr($result, strpos($result, '{'));
         $port_array = json_decode($result, true);
         ksort($port_array);
-        $this->responseJson(0, null, $port_array);
-        return true;
+        return $this->responseJson(0, null, $port_array);
     }
 
     public function doAdd() : bool
     {
         $port = intval($this->request->get['port']);
         if ($port < $this->config['ss_port_min'] || $port > $this->config['ss_port_max']) {
-            $this->responseJson(1, 'This port is not allowed');
-            return true;
+            return $this->responseJson(1, 'This port is not allowed');
         }
         $passwd = $this->request->get['name'];
         if (strlen($passwd) < 7) {
-            $this->responseJson(1, 'Name is too short');
-            return true;
+            return $this->responseJson(1, 'Name is too short');
         }
         $msg = 'add: {"server_port":' . $port . ', "password":"' . $passwd . '"}';
         $result = $this->send($msg);
         if (!$result) {
-            $this->responseJson(1, $this->errCode);
-            return false;
+            return $this->responseJson(1, $this->errCode);
         }
-        $this->responseJson(0, $result);
-        return true;
+        return $this->responseJson(0, $result);
     }
 
     public function doDel() : bool
@@ -132,11 +141,9 @@ class RequestHandler
         $msg = 'remove: {"server_port":' . $port . '}';
         $result = $this->send($msg);
         if (!$result) {
-            $this->responseJson(1, $this->errCode);
-            return false;
+            return $this->responseJson(1, $this->errCode);
         }
-        $this->responseJson(0, $result);
-        return true;
+        return $this->responseJson(0, $result);
     }
 
     public function getErrorCode()
@@ -166,17 +173,16 @@ class RequestHandler
         $timestamp = intval($this->request->get['ts']);
         $hash = $this->request->get['hash'];
         if (empty($sid) || empty($timestamp) || empty($hash)) {
-            $this->responseHtml(400, 'text/html', 'Error 400', 'Bad request');
-            return true;
+            return $this->responseJson(1, 'Bad request. Invalid parameters');
         }
         $dummy = $this->session_manager->get($sid, $timestamp, $hash);
         if (!$dummy) {
-            $this->responseHtml(400, 'text/html', 'Error 400', 'Access denied.');
-            return true;
+            return $this->responseJson(1, 'Access denied.');
         }
         $this->session = $dummy;
         return false;
     }
+
     /**
      * Filter the requests for static files
      *
@@ -210,7 +216,7 @@ class RequestHandler
         $this->response->end('<html><head><title>' . $title . '</title></head><body>' . $message . '</body></html>');
     }
 
-    private function responseJson(int $code, string $message = null, $data = null)
+    private function responseJson(int $code, string $message = null, $data = null) : bool
     {
         $obj = array(
             'code' => $code
@@ -221,13 +227,14 @@ class RequestHandler
         if ($data != null) {
             $obj['data'] = $data;
         }
-        $this->responseText('application/json', json_encode($obj));
+        return $this->responseText('application/json', json_encode($obj));
     }
 
-    private function responseText(string $content_type, string $text)
+    private function responseText(string $content_type, string $text) : bool
     {
         $this->response->header("Content-Type", $content_type);
         $this->response->end($text);
+        return true;
     }
 
 }

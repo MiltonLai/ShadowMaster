@@ -5,6 +5,7 @@ $config = array(
     'server_port'      => 8080,
     'server_daemonize' => false,
     'worker_num'       => 3,
+    'session_table_size'  => 1000,
     'no_socket_test'   => true,
     'secret'           => '4297f44b13955235245b2497399d7a93',
 

@@ -6,11 +6,13 @@ class SessionManager
      * @var \Swoole\Table
      */
     private $session_table;
+    private $session_table_size_limit;
     private $secret;
 
     public function __construct(array $config, \Swoole\Table $table)
     {
         $this->session_table = $table;
+        $this->session_table_size_limit = $config['session_table_size'];
         $this->secret = $config['secret'];
         $this->cleanup();
     }
@@ -77,25 +79,32 @@ class SessionManager
 
         $hash = md5($password);
         echo $hash."\n";
-        if ($hash != $this->secret) {
-            sleep(3);
+        if ($hash == $this->secret) {
+            $this->session_table->set($sid, array(
+                'uid'       => $username,
+                'username'  => $username,
+            ));
+            return true;
+        }
+        return false;
+    }
+
+    public function logout(string $sid) : bool
+    {
+        if ($this->session_table->exist($sid)) {
+            $this->session_table->set($sid, array(
+                'uid'       => ANONYMOUS_UID,
+                'username'  => 'Anonymous',
+            ));
+            return true;
+        } else {
             return false;
         }
-        $this->session_table->set($sid, array(
-            'uid'       => $username,
-            'username'  => $username,
-        ));
-        return true;
     }
 
-    public function logout(string $sid)
+    public function create(string $secure) : array
     {
-        $this->reset($sid);
-    }
-
-    public function create(string $secure) : string
-    {
-        if ($this->session_table->count() > 1000) {
+        if ($this->session_table->count() >= $this->session_table_size_limit) {
             $this->cleanup();
         }
         $session = array(
@@ -108,7 +117,10 @@ class SessionManager
         );
         $this->session_table->set($session['sid'], $session);
         echo 'Table size: ' . $this->size() . "\n";
-        return $session['sid'];
+        return array(
+            'sid'           => $session['sid'],
+            'table_size'    => $this->session_table->count()
+        );
     }
 
     private function validate($session, int $timestamp, string $hash) : bool
